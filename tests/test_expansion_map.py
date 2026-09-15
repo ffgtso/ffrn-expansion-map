@@ -72,6 +72,15 @@ class ParseNodesTests(unittest.TestCase):
         )
         self.assertEqual(nodes, [])
 
+    def test_empty_nodes_are_skipped_before_auto_detection(self):
+        for empty_nodes in ([], {}):
+            with self.subTest(empty_nodes=empty_nodes):
+                nodes = parse_nodes(
+                    {"version": 2, "nodes": empty_nodes, "timestamp": "2026-09-15T16:07:25.266Z"},
+                    Source("empty", "unused", "auto"),
+                )
+                self.assertEqual(nodes, [])
+
 
 class AggregationTests(unittest.TestCase):
     def test_choose_area_respects_priority(self):

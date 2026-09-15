@@ -243,6 +243,11 @@ def parse_nodes(document: Any, source: Source) -> list[Node]:
     if not isinstance(document, Mapping):
         raise ExpansionMapError(f"Source {source.name!r} is not a JSON object")
 
+    nodes = document.get("nodes")
+    if isinstance(nodes, (Mapping, list)) and not nodes:
+        LOG.info("Skipping empty source %s", source.name)
+        return []
+
     fmt = source.format
     if fmt == "auto":
         fmt = detect_format(document)
