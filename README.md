@@ -102,7 +102,7 @@ Standardmäßig wird `https://global.mapit.mysociety.org/` verwendet. Gesucht wi
   "mapit_url": "https://mapit.example.org/",
   "area_types": ["O08", "O07", "O06"],
   "cache": ".cache/mapit.json",
-  "request_delay": 0.1
+  "request_delay": 1.0
 }
 ```
 
@@ -114,11 +114,11 @@ Der persistente Cache ist wichtig: Ein Node-Feed kann viele Punkte enthalten, un
 ./mkpoly --help
 ```
 
-Nützlich sind insbesondere `--output`, `--mapit-url`, `--area-types`, `--keep-going`, `--strict`, `--timeout` und `--request-delay`.
+Nützlich sind insbesondere `--output`, `--mapit-url`, `--area-types`, `--keep-going`, `--strict`, `--timeout` und `--request-delay`. Für den öffentlichen MapIt-Dienst gilt standardmäßig eine Pause von einer Sekunde zwischen Abfragen. Bei HTTP 403 oder 429 wartet der Client vor einem erneuten Versuch mindestens fünf Sekunden und berücksichtigt einen numerischen `Retry-After`-Header.
 
 ## Frontend
 
-Das Frontend wurde auf Leaflet 1.9.4 und Browser-`fetch()` aktualisiert. jQuery wird nicht mehr benötigt, alle Ressourcen werden per HTTPS geladen, und die Karte zoomt nach dem Laden automatisch auf die erzeugten Verwaltungsgebiete.
+Das Frontend wurde auf Leaflet 1.9.4 und Browser-`fetch()` aktualisiert. jQuery wird nicht mehr benötigt. Die OSM-Kacheln kommen von `https://map03.4830.org/tiles_cache/osm_mapnik/{z}/{x}/{y}.png`; die Karte zoomt nach dem Laden automatisch auf die erzeugten Verwaltungsgebiete.
 
 ## Tests
 

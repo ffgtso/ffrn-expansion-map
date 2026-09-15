@@ -23,6 +23,7 @@ DEFAULT_MAPIT_URL = "https://global.mapit.mysociety.org/"
 DEFAULT_AREA_TYPES = ("O08", "O07", "O06")
 SUPPORTED_FORMATS = ("auto", "meshviewer", "hopglass", "ffmap", "nodelist")
 USER_AGENT = "ffrn-expansion-map/2 (+https://github.com/ffgtso/ffrn-expansion-map)"
+DEFAULT_REQUEST_DELAY = 1.0
 
 
 class ExpansionMapError(RuntimeError):
@@ -76,7 +77,20 @@ class JsonHttpClient:
             except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
                 last_error = exc
                 if attempt < self.retries:
-                    time.sleep(0.5 * (2**attempt))
+                    retry_after = None
+                    if isinstance(exc, HTTPError) and exc.headers:
+                        retry_after = exc.headers.get("Retry-After")
+                    try:
+                        delay = max(0.0, float(retry_after)) if retry_after is not None else None
+                    except (TypeError, ValueError):
+                        delay = None
+                    throttled = isinstance(exc, HTTPError) and exc.code in {403, 429}
+                    if delay is None:
+                        delay = 5.0 * (2**attempt) if throttled else 0.5 * (2**attempt)
+                    elif throttled:
+                        delay = max(delay, 5.0 * (2**attempt))
+                    LOG.warning("Request failed (%s); retrying in %.1f seconds", exc, delay)
+                    time.sleep(delay)
 
         raise ExpansionMapError(f"Cannot fetch JSON from {location}: {last_error}")
 
@@ -135,7 +149,7 @@ class MapItClient:
         base_url: str,
         area_types: Sequence[str],
         cache: MapItCache,
-        request_delay: float = 0.1,
+        request_delay: float = DEFAULT_REQUEST_DELAY,
     ) -> None:
         self.http = http
         self.base_url = base_url.rstrip("/") + "/"
@@ -532,7 +546,7 @@ def run(args: argparse.Namespace) -> int:
 
     request_delay = args.request_delay
     if request_delay is None:
-        request_delay = float(config.get("request_delay", 0.1))
+        request_delay = float(config.get("request_delay", DEFAULT_REQUEST_DELAY))
 
     cache_path: Path | None
     if args.no_cache:

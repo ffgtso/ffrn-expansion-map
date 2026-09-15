@@ -1,8 +1,11 @@
 import tempfile
 import unittest
 from pathlib import Path
+from urllib.error import HTTPError
+from unittest.mock import patch
 
 from expansion_map import (
+    JsonHttpClient,
     MapItCache,
     Node,
     Position,
@@ -12,6 +15,25 @@ from expansion_map import (
     merge_nodes,
     parse_nodes,
 )
+
+
+class FakeResponse:
+    class Headers:
+        @staticmethod
+        def get_content_charset():
+            return "utf-8"
+
+    headers = Headers()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    @staticmethod
+    def read():
+        return b'{"ok": true}'
 
 
 class FakeMapIt:
@@ -80,6 +102,41 @@ class ParseNodesTests(unittest.TestCase):
                     Source("empty", "unused", "auto"),
                 )
                 self.assertEqual(nodes, [])
+
+
+class HttpClientTests(unittest.TestCase):
+    def test_403_retry_uses_retry_after_header(self):
+        error = HTTPError(
+            "https://example.invalid/data.json",
+            403,
+            "Forbidden",
+            {"Retry-After": "7"},
+            None,
+        )
+        with (
+            patch("expansion_map.urlopen", side_effect=[error, FakeResponse()]),
+            patch("expansion_map.time.sleep") as sleep,
+        ):
+            document = JsonHttpClient(retries=1).get_json("https://example.invalid/data.json")
+
+        self.assertEqual(document, {"ok": True})
+        sleep.assert_called_once_with(7.0)
+
+    def test_403_retry_enforces_minimum_backoff(self):
+        error = HTTPError(
+            "https://example.invalid/data.json",
+            403,
+            "Forbidden",
+            {"Retry-After": "1"},
+            None,
+        )
+        with (
+            patch("expansion_map.urlopen", side_effect=[error, FakeResponse()]),
+            patch("expansion_map.time.sleep") as sleep,
+        ):
+            JsonHttpClient(retries=1).get_json("https://example.invalid/data.json")
+
+        sleep.assert_called_once_with(5.0)
 
 
 class AggregationTests(unittest.TestCase):

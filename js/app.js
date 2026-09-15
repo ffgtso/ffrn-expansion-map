@@ -44,7 +44,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   const map = L.map('map', { preferCanvas: true }).setView([49.47, 8.56], 9);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  L.tileLayer('https://map03.4830.org/tiles_cache/osm_mapnik/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap-Mitwirkende',
   }).addTo(map);
