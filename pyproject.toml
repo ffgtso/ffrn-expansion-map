@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ffrn-expansion-map"
+version = "2.0.0"
+description = "Generate administrative-area GeoJSON from multiple Freifunk Hopglass/Meshviewer feeds"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Ben Oswald and contributors" }]
+dependencies = []
+
+[project.scripts]
+ffrn-expansion-map = "expansion_map:cli"
+
+[tool.setuptools]
+py-modules = ["expansion_map"]

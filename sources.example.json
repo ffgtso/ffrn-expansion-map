@@ -1,0 +1,18 @@
+{
+  "sources": [
+    {
+      "name": "community-a",
+      "url": "https://example.org/meshviewer.json"
+    },
+    {
+      "name": "community-b",
+      "url": "https://example.net/nodes.json",
+      "format": "hopglass"
+    }
+  ],
+  "output": "nodes.geojson",
+  "mapit_url": "https://global.mapit.mysociety.org/",
+  "area_types": ["O08", "O07", "O06"],
+  "cache": ".cache/mapit.json",
+  "request_delay": 0.1
+}

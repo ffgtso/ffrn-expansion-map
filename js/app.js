@@ -1,59 +1,143 @@
-// init leaflet map
-var map = L.map('map').setView([49.47704787438876, 8.5638427734375], 10);
-L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors <br/> Map tiles by CartoDB, under CC BY 3.0. Data by OpenStreetMap, under ODbL.'
-}).addTo(map);
+'use strict';
 
-var geojson;
+const grades = [0, 5, 10, 15, 20, 30, 40, 50];
 
-// I think this isn't nice, someone with better js skills should fix this
-$.get('nodes.geojson', function(json) {
-    geojson = L.geoJson(JSON.parse(json), {
-        style: style,
-        onEachFeature: onEachFeature
-    }).addTo(map);
-})
+function getColor(value) {
+  return value > 50 ? '#1b9e77' :
+    value > 40 ? '#d95f02' :
+    value > 30 ? '#7570b3' :
+    value > 20 ? '#e7298a' :
+    value > 15 ? '#66a61e' :
+    value > 10 ? '#e6ab02' :
+    value > 5 ? '#a6761d' :
+    '#666666';
+}
 
-// init legend element
-var legend = L.control({
-    position: 'bottomright'
-});
+function featureStyle(feature) {
+  return {
+    fillColor: getColor(feature.properties.count),
+    weight: 2,
+    opacity: 1,
+    color: '#fff',
+    dashArray: '3',
+    fillOpacity: 0.55,
+  };
+}
 
-// build the legend
-legend.onAdd = function(map) {
+function sourceBreakdown(sources = {}) {
+  return Object.entries(sources)
+    .sort(([, left], [, right]) => right - left)
+    .map(([name, count]) => `${name}: ${count}`)
+    .join(' · ');
+}
 
-    var div = L.DomUtil.create('div', 'info legend'),
-        grades = [0, 5, 10, 15, 20, 30, 40, 50],
-        labels = [];
+function setError(message) {
+  const element = document.getElementById('error');
+  element.textContent = message;
+  element.hidden = false;
+}
 
-    // loop through our density intervals and generate a label with a colored square for each interval
-    for (var i = 0; i < grades.length; i++) {
-        div.innerHTML +=
-            '<div class="legend-point"><i style="background:' + getColor(grades[i] + 1) + '"></i> ' +
-            grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + ' Knoten<br></div>' : '+ Knoten</div>');
-    }
+window.addEventListener('DOMContentLoaded', async () => {
+  if (typeof L === 'undefined') {
+    setError('Leaflet konnte nicht geladen werden.');
+    return;
+  }
 
-    return div;
-};
+  const map = L.map('map', { preferCanvas: true }).setView([49.47, 8.56], 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap-Mitwirkende',
+  }).addTo(map);
 
-// add legend to the map
-legend.addTo(map);
-
-// init info element
-var info = L.control();
-
-// build info element
-info.onAdd = function(map) {
-    this._div = L.DomUtil.create('div', 'info'); // create a div with a class "info"
+  const info = L.control();
+  info.onAdd = function onAdd() {
+    this._div = L.DomUtil.create('section', 'info');
     this.update();
     return this._div;
-};
+  };
+  info.update = function update(properties) {
+    this._div.replaceChildren();
+    const heading = document.createElement('h1');
+    heading.textContent = 'Freifunk Knoten-Einzugsgebiet';
+    this._div.appendChild(heading);
 
-// update the info box with the data frome the fields hovered
-info.update = function(props) {
-    this._div.innerHTML = '<h4>Freifunk Rhein Neckar </br>Knoten Einzugsgebiet und Verteilung</h4>' + (props ?
-        '<b>' + props.name + '</b><br />' + props.count + ' Knoten' : 'Fahre über ein Gebiet um mehr zu erfahren');
-};
+    if (!properties) {
+      const hint = document.createElement('p');
+      hint.textContent = 'Über ein Gebiet fahren oder klicken, um Details zu sehen.';
+      this._div.appendChild(hint);
+      return;
+    }
 
-// add info element to map
-info.addTo(map);
+    const name = document.createElement('strong');
+    name.textContent = properties.name;
+    this._div.appendChild(name);
+
+    const count = document.createElement('p');
+    count.textContent = `${properties.count} Knoten`;
+    this._div.appendChild(count);
+
+    const sources = sourceBreakdown(properties.sources);
+    if (sources) {
+      const breakdown = document.createElement('small');
+      breakdown.textContent = sources;
+      this._div.appendChild(breakdown);
+    }
+  };
+  info.addTo(map);
+
+  const legend = L.control({ position: 'bottomright' });
+  legend.onAdd = function onAdd() {
+    const div = L.DomUtil.create('div', 'info legend');
+    const title = document.createElement('strong');
+    title.textContent = 'Knoten';
+    div.appendChild(title);
+
+    grades.forEach((grade, index) => {
+      const row = document.createElement('div');
+      row.className = 'legend-point';
+      const swatch = document.createElement('i');
+      swatch.style.background = getColor(grade + 1);
+      const next = grades[index + 1];
+      row.append(swatch, document.createTextNode(next ? `${grade}–${next}` : `${grade}+`));
+      div.appendChild(row);
+    });
+    return div;
+  };
+  legend.addTo(map);
+
+  try {
+    const response = await fetch('nodes.geojson', { cache: 'no-store' });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    let geojson;
+
+    const onEachFeature = (feature, layer) => {
+      layer.on({
+        mouseover(event) {
+          event.target.setStyle({ weight: 3, color: '#555', dashArray: '', fillOpacity: 0.75 });
+          event.target.bringToFront();
+          info.update(feature.properties);
+        },
+        mouseout(event) {
+          geojson.resetStyle(event.target);
+          info.update();
+        },
+        click(event) {
+          map.fitBounds(event.target.getBounds(), { padding: [20, 20] });
+          info.update(feature.properties);
+        },
+      });
+    };
+
+    geojson = L.geoJSON(data, { style: featureStyle, onEachFeature }).addTo(map);
+    const bounds = geojson.getBounds();
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [20, 20], maxZoom: 11 });
+    }
+  } catch (error) {
+    console.error(error);
+    setError(`nodes.geojson konnte nicht geladen werden: ${error.message}`);
+  }
+});
